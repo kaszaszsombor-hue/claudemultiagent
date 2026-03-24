@@ -524,34 +524,33 @@
     return div;
   }
 
-  async function callClaude(systemPrompt, history, userMessage, context) {
+ async function callClaude(systemPrompt, history, userMessage, context) {
     const messages = [
       ...history,
       { role: 'user', content: userMessage }
     ];
-
     const contextNote = context ? `\n\nShared context:\n${context}` : '';
-
+    
     const response = await fetch('https://api.anthropic.com/v1/messages', {
       method: 'POST',
-      headers: { 
+      headers: new Headers({
         'Content-Type': 'application/json',
         'x-api-key': document.getElementById('apiKeyInput').value,
         'anthropic-version': '2023-06-01',
         'anthropic-dangerous-direct-browser-access': 'true'
-      },
+      }),
       body: JSON.stringify({
         model: 'claude-haiku-4-5-20251001',
         max_tokens: 1000,
         system: systemPrompt + contextNote,
-        messages
+        messages: messages
       })
     });
 
     const data = await response.json();
+    console.log('API response:', data);
     return data.content?.[0]?.text || 'No response.';
   }
-
   function updateKeyStatus() {
     const key = document.getElementById('apiKeyInput').value;
     const status = document.getElementById('keyStatus');
