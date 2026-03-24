@@ -1,0 +1,647 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Dual Claude</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Space+Mono:ital,wght@0,400;0,700;1,400&family=Syne:wght@400;600;800&display=swap');
+
+  :root {
+    --bg: #0a0a0f;
+    --surface: #111118;
+    --border: #1e1e2e;
+    --a-color: #00d4ff;
+    --a-glow: rgba(0, 212, 255, 0.15);
+    --b-color: #ff6b35;
+    --b-glow: rgba(255, 107, 53, 0.15);
+    --text: #e8e8f0;
+    --muted: #555570;
+    --input-bg: #0f0f1a;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'Space Mono', monospace;
+    height: 100vh;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
+
+  header {
+    padding: 16px 24px;
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    background: var(--surface);
+  }
+
+  header h1 {
+    font-family: 'Syne', sans-serif;
+    font-weight: 800;
+    font-size: 18px;
+    letter-spacing: -0.5px;
+    color: var(--text);
+  }
+
+  .agents-label {
+    display: flex;
+    gap: 12px;
+    margin-left: auto;
+    font-size: 11px;
+  }
+
+  .agent-tag {
+    padding: 4px 10px;
+    border-radius: 4px;
+    font-weight: 700;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+  }
+
+  .agent-tag.a { background: var(--a-glow); color: var(--a-color); border: 1px solid var(--a-color); }
+  .agent-tag.b { background: var(--b-glow); color: var(--b-color); border: 1px solid var(--b-color); }
+
+  .apikey-bar {
+    padding: 8px 24px;
+    background: #0a0a12;
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    font-size: 11px;
+  }
+
+  .apikey-bar input {
+    flex: 1;
+    background: transparent;
+    border: none;
+    color: var(--muted);
+    font-family: 'Space Mono', monospace;
+    font-size: 11px;
+    outline: none;
+  }
+
+  .apikey-bar input:focus { color: var(--text); }
+
+  .apikey-label {
+    color: var(--b-color);
+    font-weight: 700;
+    font-size: 10px;
+    letter-spacing: 1px;
+    white-space: nowrap;
+  }
+
+  .apikey-status {
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 1px;
+    white-space: nowrap;
+  }
+
+  .context-bar {
+    padding: 8px 24px;
+    background: #0d0d15;
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    font-size: 11px;
+    color: var(--muted);
+  }
+
+  .context-bar textarea {
+    flex: 1;
+    background: transparent;
+    border: none;
+    color: var(--muted);
+    font-family: 'Space Mono', monospace;
+    font-size: 11px;
+    resize: none;
+    outline: none;
+    height: 36px;
+    line-height: 1.4;
+  }
+
+  .context-bar textarea:focus { color: var(--text); }
+
+  .context-label {
+    color: var(--a-color);
+    font-weight: 700;
+    font-size: 10px;
+    letter-spacing: 1px;
+    white-space: nowrap;
+  }
+
+  .chat-area {
+    flex: 1;
+    overflow-y: auto;
+    padding: 24px;
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+    scrollbar-width: thin;
+    scrollbar-color: var(--border) transparent;
+  }
+
+  .message {
+    display: flex;
+    gap: 14px;
+    animation: fadeIn 0.3s ease;
+  }
+
+  @keyframes fadeIn {
+    from { opacity: 0; transform: translateY(8px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+
+  .message.user { flex-direction: row-reverse; }
+
+  .avatar {
+    width: 32px;
+    height: 32px;
+    border-radius: 6px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 0.5px;
+    flex-shrink: 0;
+    margin-top: 2px;
+  }
+
+  .avatar.a { background: var(--a-glow); color: var(--a-color); border: 1px solid var(--a-color); }
+  .avatar.b { background: var(--b-glow); color: var(--b-color); border: 1px solid var(--b-color); }
+  .avatar.user { background: #1e1e2e; color: var(--muted); border: 1px solid var(--border); }
+
+  .bubble {
+    max-width: 70%;
+    padding: 12px 16px;
+    border-radius: 8px;
+    font-size: 13px;
+    line-height: 1.65;
+    position: relative;
+  }
+
+  .message.agent-a .bubble {
+    background: var(--a-glow);
+    border: 1px solid rgba(0, 212, 255, 0.2);
+    border-top-left-radius: 2px;
+  }
+
+  .message.agent-b .bubble {
+    background: var(--b-glow);
+    border: 1px solid rgba(255, 107, 53, 0.2);
+    border-top-left-radius: 2px;
+  }
+
+  .message.user .bubble {
+    background: #1a1a28;
+    border: 1px solid var(--border);
+    border-top-right-radius: 2px;
+    text-align: right;
+  }
+
+  .agent-name {
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+    margin-bottom: 6px;
+  }
+
+  .agent-name.a { color: var(--a-color); }
+  .agent-name.b { color: var(--b-color); }
+  .agent-name.user { color: var(--muted); text-align: right; }
+
+  .thinking {
+    display: flex;
+    gap: 4px;
+    align-items: center;
+    padding: 4px 0;
+  }
+
+  .thinking span {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    animation: pulse 1.2s infinite;
+  }
+
+  .thinking span:nth-child(2) { animation-delay: 0.2s; }
+  .thinking span:nth-child(3) { animation-delay: 0.4s; }
+
+  .message.agent-a .thinking span { background: var(--a-color); }
+  .message.agent-b .thinking span { background: var(--b-color); }
+
+  @keyframes pulse {
+    0%, 80%, 100% { opacity: 0.2; transform: scale(0.8); }
+    40% { opacity: 1; transform: scale(1); }
+  }
+
+  .input-area {
+    padding: 16px 24px;
+    border-top: 1px solid var(--border);
+    background: var(--surface);
+  }
+
+  .mode-selector {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 12px;
+  }
+
+  .mode-btn {
+    padding: 5px 12px;
+    border-radius: 4px;
+    border: 1px solid var(--border);
+    background: transparent;
+    color: var(--muted);
+    font-family: 'Space Mono', monospace;
+    font-size: 11px;
+    cursor: pointer;
+    transition: all 0.15s;
+    font-weight: 700;
+    letter-spacing: 0.5px;
+  }
+
+  .mode-btn:hover { border-color: var(--muted); color: var(--text); }
+  .mode-btn.active.a { border-color: var(--a-color); color: var(--a-color); background: var(--a-glow); }
+  .mode-btn.active.b { border-color: var(--b-color); color: var(--b-color); background: var(--b-glow); }
+  .mode-btn.active.both { border-color: #9b59b6; color: #9b59b6; background: rgba(155, 89, 182, 0.1); }
+
+  .input-row {
+    display: flex;
+    gap: 10px;
+    align-items: flex-end;
+  }
+
+  textarea#userInput {
+    flex: 1;
+    background: var(--input-bg);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    color: var(--text);
+    font-family: 'Space Mono', monospace;
+    font-size: 13px;
+    padding: 10px 14px;
+    resize: none;
+    outline: none;
+    min-height: 44px;
+    max-height: 120px;
+    transition: border-color 0.15s;
+    line-height: 1.5;
+  }
+
+  textarea#userInput:focus { border-color: var(--a-color); }
+
+  .send-btn {
+    width: 44px;
+    height: 44px;
+    border-radius: 6px;
+    border: none;
+    background: var(--a-color);
+    color: var(--bg);
+    cursor: pointer;
+    font-size: 18px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.15s;
+    flex-shrink: 0;
+  }
+
+  .send-btn:hover { transform: scale(1.05); }
+  .send-btn:disabled { opacity: 0.4; cursor: not-allowed; transform: none; }
+
+  .empty-state {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 16px;
+    color: var(--muted);
+    text-align: center;
+  }
+
+  .empty-state h2 {
+    font-family: 'Syne', sans-serif;
+    font-size: 28px;
+    font-weight: 800;
+    color: var(--text);
+    letter-spacing: -1px;
+  }
+
+  .empty-state p { font-size: 12px; line-height: 1.7; max-width: 400px; }
+
+  .suggestions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    justify-content: center;
+    margin-top: 8px;
+  }
+
+  .suggestion {
+    padding: 6px 14px;
+    border: 1px solid var(--border);
+    border-radius: 20px;
+    font-size: 11px;
+    cursor: pointer;
+    transition: all 0.15s;
+    color: var(--muted);
+  }
+
+  .suggestion:hover { border-color: var(--a-color); color: var(--a-color); background: var(--a-glow); }
+
+  .divider {
+    text-align: center;
+    font-size: 10px;
+    color: var(--muted);
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    position: relative;
+  }
+
+  .divider::before, .divider::after {
+    content: '';
+    position: absolute;
+    top: 50%;
+    width: 40%;
+    height: 1px;
+    background: var(--border);
+  }
+
+  .divider::before { left: 0; }
+  .divider::after { right: 0; }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>DUAL CLAUDE</h1>
+  <div class="agents-label">
+    <span class="agent-tag a">TECH</span>
+    <span class="agent-tag b">BIZ</span>
+  </div>
+</header>
+
+<div class="apikey-bar">
+  <span class="apikey-label">API KEY</span>
+  <input type="password" id="apiKeyInput" placeholder="Paste your Anthropic API key here (not saved anywhere)..." oninput="updateKeyStatus()"/>
+  <span class="apikey-status" id="keyStatus" style="color: var(--muted)">NOT SET</span>
+</div>
+
+<div class="context-bar">
+  <span class="context-label">CTX</span>
+  <textarea id="contextInput" placeholder="Add shared context for both agents (e.g. project description, background info)...">I work as a Junior Automation Developer at Avis Budget Group BSC. I build automations using Smartsheet, Power Automate, Zendesk, and HTTP APIs. I'm converting manual email-based processes into digital workflows. I'm also interested in side hustle opportunities leveraging my automation skills.</textarea>
+</div>
+
+<div class="chat-area" id="chatArea">
+  <div class="empty-state" id="emptyState">
+    <h2>DUAL CLAUDE</h2>
+    <p>Two AI perspectives, one conversation.<br>
+    <span style="color: var(--a-color)">TECH</span> thinks in systems & code. 
+    <span style="color: var(--b-color)">BIZ</span> thinks in value & opportunity.</p>
+    <div class="suggestions">
+      <div class="suggestion" onclick="useSuggestion(this)">What automation should I build next?</div>
+      <div class="suggestion" onclick="useSuggestion(this)">How can I monetize my automation skills?</div>
+      <div class="suggestion" onclick="useSuggestion(this)">Best way to architect a new flow?</div>
+      <div class="suggestion" onclick="useSuggestion(this)">Side hustle ideas for a developer</div>
+    </div>
+  </div>
+</div>
+
+<div class="input-area">
+  <div class="mode-selector">
+    <button class="mode-btn active both" onclick="setMode('both', this)">BOTH</button>
+    <button class="mode-btn a" onclick="setMode('a', this)">TECH only</button>
+    <button class="mode-btn b" onclick="setMode('b', this)">BIZ only</button>
+  </div>
+  <div class="input-row">
+    <textarea id="userInput" placeholder="Ask anything..." rows="1" onkeydown="handleKey(event)" oninput="autoResize(this)"></textarea>
+    <button class="send-btn" id="sendBtn" onclick="sendMessage()">↑</button>
+  </div>
+</div>
+
+<script>
+  const SYSTEM_A = `You are TECH — a senior technical AI with deep expertise in Power Automate, Smartsheet, APIs, automation architecture, and software development. You think in systems, flows, and code. You are precise, efficient, and love elegant technical solutions. Keep responses concise but insightful. You are part of a dual-agent conversation — the other agent is BIZ, who thinks in business value and opportunities. When relevant, reference or build on what BIZ says. Never use bullet points, write in natural prose.`;
+
+  const SYSTEM_B = `You are BIZ — a business-minded AI with expertise in entrepreneurship, productization, market opportunities, and turning technical skills into income. You think in value, customers, and monetization. You are pragmatic and opportunity-driven. Keep responses concise but insightful. You are part of a dual-agent conversation — the other agent is TECH, who thinks in systems and code. When relevant, reference or build on what TECH says. Never use bullet points, write in natural prose.`;
+
+  let mode = 'both';
+  let historyA = [];
+  let historyB = [];
+  let isLoading = false;
+
+  function setMode(m, btn) {
+    mode = m;
+    document.querySelectorAll('.mode-btn').forEach(b => b.classList.remove('active', 'a', 'b', 'both'));
+    btn.classList.add('active', m);
+  }
+
+  function useSuggestion(el) {
+    document.getElementById('userInput').value = el.textContent;
+    sendMessage();
+  }
+
+  function autoResize(el) {
+    el.style.height = 'auto';
+    el.style.height = Math.min(el.scrollHeight, 120) + 'px';
+  }
+
+  function handleKey(e) {
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault();
+      sendMessage();
+    }
+  }
+
+  function getContext() {
+    return document.getElementById('contextInput').value.trim();
+  }
+
+  function appendMessage(role, text, agentClass) {
+    const empty = document.getElementById('emptyState');
+    if (empty) empty.remove();
+
+    const chatArea = document.getElementById('chatArea');
+    const div = document.createElement('div');
+    div.className = `message ${agentClass}`;
+
+    const avatarText = agentClass === 'agent-a' ? 'TECH' : agentClass === 'agent-b' ? 'BIZ' : 'YOU';
+    const avatarClass = agentClass === 'agent-a' ? 'a' : agentClass === 'agent-b' ? 'b' : 'user';
+    const nameClass = agentClass === 'agent-a' ? 'a' : agentClass === 'agent-b' ? 'b' : 'user';
+    const nameText = agentClass === 'agent-a' ? 'TECH' : agentClass === 'agent-b' ? 'BIZ' : 'YOU';
+
+    div.innerHTML = `
+      <div class="avatar ${avatarClass}">${avatarText}</div>
+      <div>
+        <div class="agent-name ${nameClass}">${nameText}</div>
+        <div class="bubble">${text}</div>
+      </div>
+    `;
+
+    chatArea.appendChild(div);
+    chatArea.scrollTop = chatArea.scrollHeight;
+    return div;
+  }
+
+  function appendThinking(agentClass) {
+    const empty = document.getElementById('emptyState');
+    if (empty) empty.remove();
+
+    const chatArea = document.getElementById('chatArea');
+    const div = document.createElement('div');
+    div.className = `message ${agentClass}`;
+
+    const avatarText = agentClass === 'agent-a' ? 'TECH' : 'BIZ';
+    const avatarClass = agentClass === 'agent-a' ? 'a' : 'b';
+    const nameClass = agentClass === 'agent-a' ? 'a' : 'b';
+    const nameText = agentClass === 'agent-a' ? 'TECH' : 'BIZ';
+
+    div.innerHTML = `
+      <div class="avatar ${avatarClass}">${avatarText}</div>
+      <div>
+        <div class="agent-name ${nameClass}">${nameText}</div>
+        <div class="bubble">
+          <div class="thinking">
+            <span></span><span></span><span></span>
+          </div>
+        </div>
+      </div>
+    `;
+
+    chatArea.appendChild(div);
+    chatArea.scrollTop = chatArea.scrollHeight;
+    return div;
+  }
+
+  async function callClaude(systemPrompt, history, userMessage, context) {
+    const messages = [
+      ...history,
+      { role: 'user', content: userMessage }
+    ];
+
+    const contextNote = context ? `\n\nShared context:\n${context}` : '';
+
+    const response = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: { 
+        'Content-Type': 'application/json',
+        'x-api-key': document.getElementById('apiKeyInput').value,
+        'anthropic-version': '2023-06-01',
+        'anthropic-dangerous-direct-browser-access': 'true'
+      },
+      body: JSON.stringify({
+        model: 'claude-sonnet-4-20250514',
+        max_tokens: 1000,
+        system: systemPrompt + contextNote,
+        messages
+      })
+    });
+
+    const data = await response.json();
+    return data.content?.[0]?.text || 'No response.';
+  }
+
+  function updateKeyStatus() {
+    const key = document.getElementById('apiKeyInput').value;
+    const status = document.getElementById('keyStatus');
+    if (key.startsWith('sk-ant-') && key.length > 20) {
+      status.textContent = 'READY';
+      status.style.color = 'var(--a-color)';
+    } else if (key.length > 0) {
+      status.textContent = 'INVALID';
+      status.style.color = 'var(--b-color)';
+    } else {
+      status.textContent = 'NOT SET';
+      status.style.color = 'var(--muted)';
+    }
+  }
+
+  async function sendMessage() {
+    const input = document.getElementById('userInput');
+    const text = input.value.trim();
+    const apiKey = document.getElementById('apiKeyInput').value;
+    if (!text || isLoading) return;
+    if (!apiKey || !apiKey.startsWith('sk-ant-')) {
+      alert('Please enter your Anthropic API key first!');
+      return;
+    }
+
+    isLoading = true;
+    document.getElementById('sendBtn').disabled = true;
+    input.value = '';
+    input.style.height = 'auto';
+
+    appendMessage('user', text, 'user');
+
+    const context = getContext();
+    const userMsg = text;
+
+    if (mode === 'both') {
+      // Show both thinking
+      const thinkA = appendThinking('agent-a');
+      const thinkB = appendThinking('agent-b');
+
+      try {
+        // Run both in parallel
+        const [respA, respB] = await Promise.all([
+          callClaude(SYSTEM_A, historyA, userMsg, context),
+          callClaude(SYSTEM_B, historyB, userMsg, context)
+        ]);
+
+        // Replace thinking with real responses
+        thinkA.querySelector('.bubble').innerHTML = respA;
+        thinkB.querySelector('.bubble').innerHTML = respB;
+
+        // Update histories
+        historyA.push({ role: 'user', content: userMsg });
+        historyA.push({ role: 'assistant', content: respA });
+        historyB.push({ role: 'user', content: userMsg });
+        historyB.push({ role: 'assistant', content: respB });
+
+      } catch (e) {
+        thinkA.querySelector('.bubble').textContent = 'Error: ' + e.message;
+        thinkB.querySelector('.bubble').textContent = 'Error: ' + e.message;
+      }
+
+    } else if (mode === 'a') {
+      const thinking = appendThinking('agent-a');
+      try {
+        const resp = await callClaude(SYSTEM_A, historyA, userMsg, context);
+        thinking.querySelector('.bubble').innerHTML = resp;
+        historyA.push({ role: 'user', content: userMsg });
+        historyA.push({ role: 'assistant', content: resp });
+      } catch (e) {
+        thinking.querySelector('.bubble').textContent = 'Error: ' + e.message;
+      }
+
+    } else if (mode === 'b') {
+      const thinking = appendThinking('agent-b');
+      try {
+        const resp = await callClaude(SYSTEM_B, historyB, userMsg, context);
+        thinking.querySelector('.bubble').innerHTML = resp;
+        historyB.push({ role: 'user', content: userMsg });
+        historyB.push({ role: 'assistant', content: resp });
+      } catch (e) {
+        thinking.querySelector('.bubble').textContent = 'Error: ' + e.message;
+      }
+    }
+
+    document.getElementById('chatArea').scrollTop = document.getElementById('chatArea').scrollHeight;
+    isLoading = false;
+    document.getElementById('sendBtn').disabled = false;
+    input.focus();
+  }
+</script>
+</body>
+</html>
